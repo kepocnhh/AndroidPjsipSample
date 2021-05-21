@@ -17,6 +17,8 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity android:name=".DialActivity"/>
+        <activity android:name=".RegistrationActivity"/>
         <service android:name=".CallService"/>
     </application>
 </manifest>
