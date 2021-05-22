@@ -25,7 +25,9 @@ import org.pjsip.pjsua2.OnCallStateParam
 import org.pjsip.pjsua2.OnIncomingCallParam
 import org.pjsip.pjsua2.OnRegStateParam
 import org.pjsip.pjsua2.OnSelectAccountParam
+import org.pjsip.pjsua2.StringVector
 import org.pjsip.pjsua2.TransportConfig
+import org.pjsip.pjsua2.pj_log_decoration
 import org.pjsip.pjsua2.pj_qos_type
 import org.pjsip.pjsua2.pjmedia_type
 import org.pjsip.pjsua2.pjsip_inv_state
@@ -36,6 +38,7 @@ import org.pjsip.pjsua2.pjsua_destroy_flag
 
 private class AndroidLogWriter : LogWriter() {
     override fun write(entry: LogEntry?) {
+//        println(entry?.msg)
         Log.d("org.pjsip.pjsua2", entry?.msg ?: "no message")
     }
 }
@@ -108,7 +111,7 @@ class CallService : Service() {
         result.idUri = uriId
 //        accountConfig.regConfig.setCallID(callId) // todo
         result.regConfig.registrarUri = uriRegistrar
-        result.regConfig.timeoutSec = 120 // todo
+//        result.regConfig.timeoutSec = 120 // todo
 //        accountConfig.regConfig.registerOnAdd = false // todo
         result.regConfig.registerOnAdd = true // todo
         result.sipConfig.authCreds.add(
@@ -142,18 +145,19 @@ class CallService : Service() {
         epConfig.uaConfig.userAgent = "android.pjsip.sample"
         epConfig.uaConfig.mainThreadOnly = false
         epConfig.uaConfig.threadCnt = 1
+//        val stunServers = setOf("stun.pjsip.org")
 //        epConfig.uaConfig.stunServer = StringVector().also { vector ->
 //            stunServers.forEach { vector.add(it) }
 //        }
         //
-//        epConfig.medConfig.hasIoqueue = true
-//        epConfig.medConfig.clockRate = 16000
-//        epConfig.medConfig.quality = 10
-//        epConfig.medConfig.ecOptions = 1
-//        epConfig.medConfig.ecTailLen = 200
-//        epConfig.medConfig.threadCnt = 2
+        epConfig.medConfig.hasIoqueue = true
+        epConfig.medConfig.clockRate = 16000
+        epConfig.medConfig.quality = 10
+        epConfig.medConfig.ecOptions = 1
+        epConfig.medConfig.ecTailLen = 200
+        epConfig.medConfig.threadCnt = 2
         //
-        epConfig.logConfig = LogConfig().also {
+        epConfig.logConfig = epConfig.logConfig.also {
             it.level = 4
             it.consoleLevel = 5
             logWriter = AndroidLogWriter()
@@ -288,7 +292,7 @@ class CallService : Service() {
             ACTION_MAKE_CALL -> {
                 val userToName = intent.getStringExtra(KEY_USER_TO_NAME)
                 if (userToName.isNullOrEmpty()) error("User to name is empty!")
-                requireNotNull(endpoint).audDevManager().setNullDev() // todo
+//                requireNotNull(endpoint).audDevManager().setNullDev() // todo
                 val account = requireNotNull(account)
                 val host = requireNotNull(host)
                 check(account.info.regIsActive)
@@ -320,8 +324,7 @@ class CallService : Service() {
                     override fun onCallMediaState(prm: OnCallMediaStateParam?) {
                         log("on call media state")
                         if (prm == null) TODO()
-                        val size = info.media.size
-                        for (i in 0 until size) {
+                        for (i in info.media.indices) {
 //                            val media = getMedia(i.toLong()) ?: continue
                             val mediaInfo = info.media[i]
                             if (mediaInfo.status != pjsua_call_media_status.PJSUA_CALL_MEDIA_ACTIVE) continue
@@ -353,7 +356,7 @@ class CallService : Service() {
                 val uriDestination = "sip:$userToName@$host"
                 val callOpParam = CallOpParam()
                 callOpParam.opt.audioCount = 1
-                callOpParam.opt.videoCount = 1
+                callOpParam.opt.videoCount = 0
                 call.makeCall(uriDestination, callOpParam)
                 callOpParam.delete()
 //                val id = call.id
