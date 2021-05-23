@@ -1,4 +1,4 @@
-package android.pjsip.sample
+package android.pjsip.sample.v1
 
 import android.os.Bundle
 import android.app.Activity
@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.pjsip.sample.log
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ProgressBar

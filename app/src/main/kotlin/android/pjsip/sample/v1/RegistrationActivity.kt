@@ -1,4 +1,4 @@
-package android.pjsip.sample
+package android.pjsip.sample.v1
 
 import android.app.Activity
 import android.content.BroadcastReceiver
@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.pjsip.sample.log
+import android.pjsip.sample.showToast
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -75,8 +77,7 @@ class RegistrationActivity : Activity() {
         val defaultHost = ""
         val defaultRealm = ""
         val defaultPort = 5060
-        val defaultUserFromName = "001"
-//        val defaultUserFromPassword = ""
+        val defaultUserFromName = ""
         val defaultUserFromPassword = ""
         setContentView(LinearLayout(this).also { root ->
             root.orientation = LinearLayout.VERTICAL

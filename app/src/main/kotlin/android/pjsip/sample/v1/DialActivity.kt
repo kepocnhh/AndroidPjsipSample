@@ -1,8 +1,9 @@
-package android.pjsip.sample
+package android.pjsip.sample.v1
 
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.pjsip.sample.showToast
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -17,6 +18,8 @@ class DialActivity : Activity() {
         sendBroadcast(Intent(CallService.ACTION_MAKE_CALL).also { intent ->
             intent.putExtra(CallService.KEY_USER_TO_NAME, userToName)
         })
+        finish()
+        startActivity(Intent(this, CallActivity::class.java))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

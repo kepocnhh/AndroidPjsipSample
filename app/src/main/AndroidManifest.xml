@@ -11,14 +11,15 @@
         android:icon="@mipmap/ic_launcher"
         android:label="AndroidPjsipSample"
         >
-        <activity android:name=".MainActivity">
+        <activity android:name=".v2.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity android:name=".DialActivity"/>
-        <activity android:name=".RegistrationActivity"/>
-        <service android:name=".CallService"/>
+        <activity android:name=".v2.CallActivity"/>
+<!--        <activity android:name=".v1.DialActivity"/>-->
+<!--        <activity android:name=".v1.RegistrationActivity"/>-->
+        <service android:name=".v2.CallService"/>
     </application>
 </manifest>
