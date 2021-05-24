@@ -17,6 +17,43 @@ import android.widget.TextView
 class MainActivity : Activity() {
     private var receiver: BroadcastReceiver? = null
 
+    private fun onRegistration(
+        host: String,
+        realm: String,
+        portText: String,
+        userFromName: String,
+        userFromPassword: String
+    ) {
+        if (host.isEmpty()) {
+            showToast("Host is empty!")
+            return
+        }
+        if (realm.isEmpty()) {
+            showToast("Realm is empty!")
+            return
+        }
+        val port = portText.toIntOrNull()
+        if (port == null) {
+            showToast("Port is empty!")
+            return
+        }
+        if (port < 0) {
+            showToast("Port error!")
+            return
+        }
+        if (userFromName.isEmpty()) {
+            showToast("User from name is empty!")
+            return
+        }
+        startService(Intent(this, CallService::class.java).also { intent ->
+            intent.action = CallService.ACTION_REGISTRATION
+            intent.putExtra(CallService.KEY_HOST, host)
+            intent.putExtra(CallService.KEY_REALM, realm)
+            intent.putExtra(CallService.KEY_PORT, port)
+            intent.putExtra(CallService.KEY_USER_FROM_NAME, userFromName)
+            intent.putExtra(CallService.KEY_USER_FROM_PASSWORD, userFromPassword)
+        })
+    }
     private fun onMakeCall(
         host: String,
         realm: String,
@@ -79,7 +116,7 @@ class MainActivity : Activity() {
                 when (intent.action) {
                     CallService.ACTION_CALL_STATE_BROADCAST -> {
                         val state = intent.getStringExtra(CallService.KEY_STATE)
-                        showToast("call state $state")
+//                        showToast("call state $state")
                         when (state) {
                             CallService.VALUE_STATE_ERROR -> {
                                 showToast("error")
@@ -94,7 +131,9 @@ class MainActivity : Activity() {
                                 unregisterReceiver(receiver)
                                 receiver = null
                                 finish()
-                                startActivity(Intent(this@MainActivity, CallActivity::class.java))
+                                startActivity(Intent(this@MainActivity, CallActivity::class.java).also {
+                                    it.putExtra(CallService.KEY_SIDE, intent.getStringExtra(CallService.KEY_SIDE))
+                                })
                             }
                         }
                     }
@@ -133,6 +172,18 @@ class MainActivity : Activity() {
                 container.addView(TextView(this).also { it.text = "video outgoing" })
             })
             videoOutgoingCheckBox.isChecked = true
+            root.addView(Button(this).also {
+                it.text = "registration"
+                it.setOnClickListener {
+                    onRegistration(
+                        host = hostEditText.text.toString(),
+                        realm = realmEditText.text.toString(),
+                        portText = portEditText.text.toString(),
+                        userFromName = userFromNameEditText.text.toString(),
+                        userFromPassword = userFromPasswordEditText.text.toString()
+                    )
+                }
+            })
             root.addView(Button(this).also {
                 it.text = "make call"
                 it.setOnClickListener {

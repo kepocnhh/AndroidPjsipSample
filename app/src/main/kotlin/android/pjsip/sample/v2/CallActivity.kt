@@ -44,6 +44,7 @@ class CallActivity : Activity() {
 //                            }
 //                        }
                         CallService.VALUE_STATE_CONFIRMED -> {
+                            requireNotNull(acceptIncomingButton).visibility = View.GONE
                             val time = intent.getLongExtra(CallService.KEY_CALL_TIME_START, -1)
                             check(time > 0)
                             startTimer(time)
@@ -114,6 +115,7 @@ class CallActivity : Activity() {
 
     private var timeTextView: TextView? = null
     private var timer: Timer? = null
+    private var acceptIncomingButton: Button? = null
     private var audioOutgoingStateButton: Button? = null
     private var videoOutgoingStateButton: Button? = null
     private var incomingSurfaceView: SurfaceView? = null
@@ -197,6 +199,23 @@ class CallActivity : Activity() {
             }
             this.videoOutgoingStateButton = videoOutgoingStateButton
             root.addView(videoOutgoingStateButton)
+            val acceptIncomingButton = Button(this).also {
+                it.text = "accept"
+                it.setOnClickListener {
+                    sendBroadcast(Intent(CallService.ACTION_CALL_ACCEPT))
+                }
+            }
+            this.acceptIncomingButton = acceptIncomingButton
+            root.addView(acceptIncomingButton)
+            when (intent.getStringExtra(CallService.KEY_SIDE)) {
+                CallService.VALUE_INCOMING -> {
+                    acceptIncomingButton.visibility = View.VISIBLE
+                }
+                CallService.VALUE_OUTGOING -> {
+                    acceptIncomingButton.visibility = View.GONE
+                }
+                else -> TODO()
+            }
             root.addView(Button(this).also {
                 it.text = "cancel"
                 it.setOnClickListener {

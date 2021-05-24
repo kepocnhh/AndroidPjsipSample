@@ -24,6 +24,7 @@ import org.pjsip.pjsua2.LogEntry
 import org.pjsip.pjsua2.LogWriter
 import org.pjsip.pjsua2.OnCallMediaStateParam
 import org.pjsip.pjsua2.OnCallStateParam
+import org.pjsip.pjsua2.OnIncomingCallParam
 import org.pjsip.pjsua2.OnRegStateParam
 import org.pjsip.pjsua2.TransportConfig
 import org.pjsip.pjsua2.VideoPreview
@@ -33,6 +34,7 @@ import org.pjsip.pjsua2.VideoWindowHandle
 import org.pjsip.pjsua2.pj_qos_type
 import org.pjsip.pjsua2.pjmedia_type
 import org.pjsip.pjsua2.pjsip_inv_state
+import org.pjsip.pjsua2.pjsip_status_code
 import org.pjsip.pjsua2.pjsip_transport_type_e
 import org.pjsip.pjsua2.pjsua_call_flag
 import org.pjsip.pjsua2.pjsua_call_media_status
@@ -47,6 +49,7 @@ private class AndroidLogWriter : LogWriter() {
 class CallService : Service() {
     companion object {
         const val ACTION_MAKE_CALL = "ACTION_MAKE_CALL"
+        const val ACTION_REGISTRATION = "ACTION_REGISTRATION"
         const val KEY_HOST = "KEY_HOST"
         const val KEY_REALM = "KEY_REALM"
         const val KEY_PORT = "KEY_PORT"
@@ -60,6 +63,7 @@ class CallService : Service() {
         const val VALUE_STATE_NONE = "VALUE_STATE_NONE"
         const val VALUE_STATE_ERROR = "VALUE_STATE_ERROR"
         const val VALUE_STATE_REGISTRATION = "VALUE_STATE_REGISTRATION"
+        const val VALUE_STATE_INCOMING_CALL = "VALUE_STATE_INCOMING_CALL"
         const val VALUE_STATE_EARLY = "VALUE_STATE_EARLY"
         const val VALUE_STATE_DISCONNECTED = "VALUE_STATE_DISCONNECTED"
 //        const val VALUE_STATE_MEDIA_START_TRANSMIT = "VALUE_STATE_MEDIA_START_TRANSMIT"
@@ -68,20 +72,26 @@ class CallService : Service() {
         const val ACTION_CALL_STATE_REQUEST = "ACTION_CALL_STATE_REQUEST"
         const val KEY_CALL_TIME_START = "KEY_CALL_TIME_START"
         const val ACTION_CALL_CANCEL = "ACTION_CALL_CANCEL"
+        const val ACTION_CALL_ACCEPT = "ACTION_CALL_ACCEPT"
         const val ACTION_MEDIA_STATE_REQUEST = "ACTION_MEDIA_STATE_REQUEST"
         const val ACTION_MEDIA_STATE_BROADCAST = "ACTION_MEDIA_STATE_BROADCAST"
+        const val KEY_CODE = "KEY_CODE"
         const val KEY_MEDIA_TYPE = "KEY_MEDIA_TYPE"
         const val VALUE_MEDIA_TYPE_AUDIO = "VALUE_MEDIA_TYPE_AUDIO"
         const val VALUE_MEDIA_TYPE_VIDEO = "VALUE_MEDIA_TYPE_VIDEO"
         const val VALUE_MEDIA_TYPE_VIDEO_SURFACE = "VALUE_MEDIA_TYPE_VIDEO_SURFACE"
         const val KEY_MEDIA_SIDE = "KEY_MEDIA_SIDE"
+        const val KEY_SIDE = "KEY_SIDE"
         const val ACTION_SET_VIDEO_SURFACE = "ACTION_SET_VIDEO_SURFACE"
         const val VALUE_MEDIA_INCOMING = "VALUE_MEDIA_INCOMING"
+        const val VALUE_INCOMING = "VALUE_INCOMING"
         const val VALUE_MEDIA_OUTGOING = "VALUE_MEDIA_OUTGOING"
+        const val VALUE_OUTGOING = "VALUE_OUTGOING"
         const val KEY_MEDIA_STATE = "KEY_MEDIA_STATE"
         const val VALUE_MEDIA_ENABLED = "VALUE_MEDIA_ENABLED"
         const val VALUE_MEDIA_DISABLED = "VALUE_MEDIA_DISABLED"
         const val ACTION_SET_MEDIA_STATE = "ACTION_SET_MEDIA_STATE"
+        private const val ACTION_REGISTRATION_RESULT = "ACTION_REGISTRATION_RESULT"
         private const val H264_CODEC_ID = "H264/97"
         private var logWriter: LogWriter? = null
 
@@ -123,6 +133,7 @@ class CallService : Service() {
             port: Int,
             userFromName: String,
             userFromPassword: String,
+            registerOnAdd: Boolean,
             isVideoOutgoingEnabled: Boolean
         ): AccountConfig {
             val uriId = "sip:$userFromName@$realm"
@@ -133,8 +144,7 @@ class CallService : Service() {
             result.regConfig.registrarUri = uriRegistrar
             result.regConfig.timeoutSec = 60 // todo
 //            result.regConfig.timeoutSec = 120 // todo
-            result.regConfig.registerOnAdd = false // todo
-//            result.regConfig.registerOnAdd = true // todo
+            result.regConfig.registerOnAdd = registerOnAdd
             result.sipConfig.authCreds.add(
                 AuthCredInfo(authScheme, realm, userFromName, 0, userFromPassword)
             )
@@ -162,20 +172,7 @@ class CallService : Service() {
     private var incomingVideoWindow: VideoWindow? = null
     private var outgoingVideoPreview: VideoPreview? = null
 
-    private fun onCallFinish() {
-        log("on call finish...")
-        incomingVideoWindow?.delete()
-        incomingVideoWindow = null
-        log("delete incoming video window")
-        outgoingVideoPreview?.delete()
-        outgoingVideoPreview = null
-//        log("delete outgoing video preview")
-//        videoCallMediaInfo?.delete()
-//        videoCallMediaInfo = null
-        log("delete video call media info")
-        requireNotNull(call).delete()
-        call = null
-        log("delete call")
+    private fun onAccountFinish() {
         val account = requireNotNull(account)
         account.shutdown()
         account.delete()
@@ -190,6 +187,21 @@ class CallService : Service() {
         endpoint.delete()
         this.endpoint = null
         log("delete endpoint")
+    }
+    private fun onCallFinish() {
+        incomingVideoWindow?.delete()
+        incomingVideoWindow = null
+        log("delete incoming video window")
+        outgoingVideoPreview?.delete()
+        outgoingVideoPreview = null
+//        log("delete outgoing video preview")
+//        videoCallMediaInfo?.delete()
+//        videoCallMediaInfo = null
+        log("delete video call media info")
+        requireNotNull(call).delete()
+        call = null
+        log("delete call")
+        onAccountFinish()
     }
     private fun onMakeCall(
         host: String,
@@ -210,6 +222,7 @@ class CallService : Service() {
             port = port,
             userFromName = userFromName,
             userFromPassword = userFromPassword,
+            registerOnAdd = false,
             isVideoOutgoingEnabled = isVideoOutgoingEnabled
         )
         check(account == null)
@@ -239,6 +252,7 @@ class CallService : Service() {
                 when (info.state) {
                     pjsip_inv_state.PJSIP_INV_STATE_EARLY -> {
                         sendBroadcast(Intent(ACTION_CALL_STATE_BROADCAST).also {
+                            it.putExtra(KEY_SIDE, VALUE_OUTGOING)
                             it.putExtra(KEY_STATE, VALUE_STATE_EARLY)
                         })
                     }
@@ -349,8 +363,169 @@ class CallService : Service() {
             })
         })
     }
+
+    private fun onIncomingCall(callId: Int) {
+        val endpoint = requireNotNull(endpoint)
+        val account = requireNotNull(account)
+        check(call == null)
+        this.isAudioOutgoingEnabled = true // todo
+        this.isVideoOutgoingEnabled = true // todo
+        val call = object : Call(account, callId) {
+            override fun onCallState(prm: OnCallStateParam?) {
+                if (prm == null) TODO()
+                log("on call state: ${info.state}")
+                when (info.state) {
+                    pjsip_inv_state.PJSIP_INV_STATE_EARLY -> {
+                        sendBroadcast(Intent(ACTION_CALL_STATE_BROADCAST).also {
+                            it.putExtra(KEY_SIDE, VALUE_INCOMING)
+                            it.putExtra(KEY_STATE, VALUE_STATE_EARLY)
+                        })
+                    }
+                    pjsip_inv_state.PJSIP_INV_STATE_CONNECTING -> {
+                        sendBroadcast(Intent(ACTION_CALL_STATE_BROADCAST).also {
+                            it.putExtra(KEY_STATE, VALUE_STATE_CONNECTING)
+                        })
+                    }
+                    pjsip_inv_state.PJSIP_INV_STATE_DISCONNECTED -> {
+                        sendBroadcast(Intent(ACTION_CALL_STATE_BROADCAST).also {
+                            it.putExtra(KEY_STATE, VALUE_STATE_DISCONNECTED)
+                        })
+                    }
+                    pjsip_inv_state.PJSIP_INV_STATE_CONFIRMED -> {
+                        val time = System.currentTimeMillis()
+                        callTimeStart = time
+                        sendBroadcast(Intent(ACTION_CALL_STATE_BROADCAST).also {
+                            it.putExtra(KEY_STATE, VALUE_STATE_CONFIRMED)
+                            it.putExtra(KEY_CALL_TIME_START, time)
+                        })
+                    }
+                }
+            }
+
+            override fun onCallMediaState(prm: OnCallMediaStateParam?) {
+                if (prm == null) TODO()
+                val media = info.media.indices.map {
+                    info.media[it]
+                }.filter {
+                    it.status == pjsua_call_media_status.PJSUA_CALL_MEDIA_ACTIVE
+                }
+//                        check(media.size == 2) // todo
+                val audio = media.firstOrNull {
+                    it.type == pjmedia_type.PJMEDIA_TYPE_AUDIO
+                }
+                if (audio != null) {
+                    val audioMedia = getAudioMedia(audio.index.toInt())!!
+                    val audDevManager = endpoint.audDevManager()
+                    if (isAudioOutgoingEnabled) {
+                        audDevManager.captureDevMedia.startTransmit(audioMedia)
+                    }
+                    sendBroadcast(Intent(ACTION_MEDIA_STATE_BROADCAST).also {
+                        it.putExtra(KEY_MEDIA_SIDE, VALUE_MEDIA_OUTGOING)
+                        it.putExtra(KEY_MEDIA_TYPE, VALUE_MEDIA_TYPE_AUDIO)
+                        val state = if (isAudioOutgoingEnabled) VALUE_MEDIA_ENABLED else VALUE_MEDIA_DISABLED
+                        it.putExtra(KEY_MEDIA_STATE, state)
+                    })
+                    audioMedia.startTransmit(audDevManager.playbackDevMedia)
+                }
+                val video = media.firstOrNull {
+                    it.type == pjmedia_type.PJMEDIA_TYPE_VIDEO
+                }
+                if (video != null) {
+                    val callVidSetStreamParam = CallVidSetStreamParam()
+                    requireNotNull(call).vidSetStream(pjsua_call_vid_strm_op.PJSUA_CALL_VID_STRM_START_TRANSMIT, callVidSetStreamParam)
+                    callVidSetStreamParam.delete()
+                    incomingVideoWindow = VideoWindow(video.videoIncomingWindowId)
+                    outgoingVideoPreview = VideoPreview(video.videoCapDev)
+                    log("outgoing video set $isVideoOutgoingEnabled")
+                    sendBroadcast(Intent(ACTION_SET_MEDIA_STATE).also {
+                        it.putExtra(KEY_MEDIA_SIDE, VALUE_MEDIA_OUTGOING)
+                        it.putExtra(KEY_MEDIA_TYPE, VALUE_MEDIA_TYPE_VIDEO)
+                        val state = if (isVideoOutgoingEnabled) VALUE_MEDIA_ENABLED else VALUE_MEDIA_DISABLED
+                        it.putExtra(KEY_MEDIA_STATE, state)
+                    })
+                    sendBroadcast(Intent(ACTION_MEDIA_STATE_BROADCAST).also {
+                        it.putExtra(KEY_MEDIA_TYPE, VALUE_MEDIA_TYPE_VIDEO_SURFACE)
+                    })
+                }
+            }
+        }
+        val callOpParam = CallOpParam()
+        callOpParam.statusCode = pjsip_status_code.PJSIP_SC_RINGING
+        call.answer(callOpParam)
+        callOpParam.delete()
+        this.call = call
+    }
+
+    private fun onRegistration(
+        host: String,
+        realm: String,
+        port: Int,
+        userFromName: String,
+        userFromPassword: String
+    ) {
+        check(endpoint == null)
+        val endpoint = endpoint()
+        this.endpoint = endpoint
+        val accountConfig = accountConfig(
+            host = host,
+            realm = realm,
+            port = port,
+            userFromName = userFromName,
+            userFromPassword = userFromPassword,
+            registerOnAdd = true,
+            isVideoOutgoingEnabled = isVideoOutgoingEnabled
+        )
+        check(account == null)
+        val account = object : Account() {
+            override fun onRegState(prm: OnRegStateParam?) {
+                if (prm == null) TODO()
+                sendBroadcast(Intent(ACTION_REGISTRATION_RESULT).also {
+                    it.putExtra(KEY_CODE, prm.code)
+                })
+            }
+            override fun onIncomingCall(prm: OnIncomingCallParam?) {
+                if (prm == null) TODO()
+                onIncomingCall(callId = prm.callId)
+            }
+        }
+        this.account = account
+        account.create(accountConfig)
+        account.info.regExpiresSec = 10 // todo
+    }
+
     private fun onReceive(intent: Intent) {
         when (intent.action) {
+            ACTION_REGISTRATION -> {
+                val host = intent.getStringExtra(KEY_HOST)
+                if (host.isNullOrEmpty()) error("Host is empty!")
+                val realm = intent.getStringExtra(KEY_REALM)
+                if (realm.isNullOrEmpty()) error("Realm is empty!")
+                val port = intent.getIntExtra(KEY_PORT, -1)
+                check(port > 0)
+                val userFromName = intent.getStringExtra(KEY_USER_FROM_NAME)
+                if (userFromName.isNullOrEmpty()) error("User from name is empty!")
+                val userFromPassword = intent.getStringExtra(KEY_USER_FROM_PASSWORD).orEmpty()
+                onRegistration(
+                    host = host,
+                    realm = realm,
+                    port = port,
+                    userFromName = userFromName,
+                    userFromPassword = userFromPassword
+                )
+            }
+            ACTION_REGISTRATION_RESULT -> {
+                val code = intent.getIntExtra(KEY_CODE, -1)
+                if (code == 200) {
+                    sendBroadcast(Intent(ACTION_CALL_STATE_BROADCAST).also {
+                        it.putExtra(KEY_STATE, VALUE_STATE_REGISTRATION)
+                    })
+                } else {
+                    onAccountFinish()
+                    sendBroadcast(Intent(ACTION_CALL_STATE_BROADCAST).also {
+                        it.putExtra(KEY_STATE, VALUE_STATE_ERROR)
+                    })
+                }
+            }
             ACTION_MEDIA_STATE_REQUEST -> {
                 sendBroadcast(Intent(ACTION_MEDIA_STATE_BROADCAST).also {
                     it.putExtra(KEY_MEDIA_TYPE, VALUE_MEDIA_TYPE_AUDIO)
@@ -486,6 +661,15 @@ class CallService : Service() {
                     else -> TODO()
                 }
             }
+            ACTION_CALL_ACCEPT -> {
+                val call = requireNotNull(call)
+                val callOpParam = CallOpParam()
+                callOpParam.opt.audioCount = 1
+                callOpParam.opt.videoCount = 1
+                callOpParam.statusCode = pjsip_status_code.PJSIP_SC_OK
+                call.answer(callOpParam)
+                callOpParam.delete()
+            }
             ACTION_CALL_CANCEL -> {
                 onCallFinish()
             }
@@ -552,9 +736,12 @@ class CallService : Service() {
 //        executor = Executors.newFixedThreadPool(5)
         registerReceiver(receiver, IntentFilter().also {
             setOf(
+                ACTION_REGISTRATION,
+                ACTION_REGISTRATION_RESULT,
                 ACTION_MEDIA_STATE_REQUEST,
                 ACTION_SET_VIDEO_SURFACE,
                 ACTION_SET_MEDIA_STATE,
+                ACTION_CALL_ACCEPT,
                 ACTION_CALL_CANCEL,
                 ACTION_CALL_STATE_BROADCAST,
                 ACTION_CALL_STATE_REQUEST,
