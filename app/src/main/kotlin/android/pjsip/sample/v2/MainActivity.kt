@@ -24,7 +24,8 @@ class MainActivity : Activity() {
         userFromName: String,
         userFromPassword: String,
         userToName: String,
-        isAudioOutgoingEnabled: Boolean
+        isAudioOutgoingEnabled: Boolean,
+        isVideoOutgoingEnabled: Boolean
     ) {
         if (host.isEmpty()) {
             showToast("Host is empty!")
@@ -61,6 +62,7 @@ class MainActivity : Activity() {
             intent.putExtra(CallService.KEY_USER_FROM_PASSWORD, userFromPassword)
             intent.putExtra(CallService.KEY_USER_TO_NAME, userToName)
             intent.putExtra(CallService.KEY_AUDIO_OUTGOING_ENABLED, isAudioOutgoingEnabled)
+            intent.putExtra(CallService.KEY_VIDEO_OUTGOING_ENABLED, isVideoOutgoingEnabled)
         })
     }
 
@@ -125,6 +127,12 @@ class MainActivity : Activity() {
                 container.addView(TextView(this).also { it.text = "audio outgoing" })
             })
             audioOutgoingCheckBox.isChecked = true
+            val videoOutgoingCheckBox = CheckBox(this)
+            root.addView(LinearLayout(this).also { container ->
+                container.addView(videoOutgoingCheckBox)
+                container.addView(TextView(this).also { it.text = "video outgoing" })
+            })
+            videoOutgoingCheckBox.isChecked = true
             root.addView(Button(this).also {
                 it.text = "make call"
                 it.setOnClickListener {
@@ -135,7 +143,8 @@ class MainActivity : Activity() {
                         userFromName = userFromNameEditText.text.toString(),
                         userFromPassword = userFromPasswordEditText.text.toString(),
                         userToName = userToNameEditText.text.toString(),
-                        isAudioOutgoingEnabled = audioOutgoingCheckBox.isChecked
+                        isAudioOutgoingEnabled = audioOutgoingCheckBox.isChecked,
+                        isVideoOutgoingEnabled = videoOutgoingCheckBox.isChecked
                     )
                 }
             })
