@@ -133,7 +133,9 @@ class CallActivity : Activity() {
                 val m = minutes - h * 60
                 val s = TimeUnit.MILLISECONDS.toSeconds(d) - minutes * 60
                 val timeTextView = requireNotNull(timeTextView)
-                timeTextView.text = String.format("%02d:%02d:%02d", h, m, s)
+                runOnUiThread {
+                    timeTextView.text = String.format("%02d:%02d:%02d", h, m, s)
+                }
             }
         }
         val delay = 0L

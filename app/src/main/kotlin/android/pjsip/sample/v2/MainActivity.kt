@@ -105,11 +105,12 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val defaultHost = ""
-        val defaultRealm = ""
+        val defaultHost = "149.255.118.71"
+        val defaultRealm = defaultHost
         val defaultPort = 5060
-        val defaultUserFromName = "001"
-        val defaultUserFromPassword = ""
+        val defaultUserFromName = "3012"
+        val defaultUserFromPassword = "lsr123456"
+        val defaultUserToName = "3013"
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent == null) return
